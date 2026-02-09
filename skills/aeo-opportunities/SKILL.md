@@ -1,6 +1,6 @@
 ---
 name: aeo-opportunities
-description: Discovers AEO optimization opportunities and creates action grids. Use when a user wants to find content to refresh, topics to create content for, or citation opportunities to pursue for better AI visibility. Guides through three strategies: content refresh, content creation, and offsite citations. Requires AirOps MCP connection.
+description: "Discovers AEO optimization opportunities and creates action grids. Use when a user wants to find content to refresh, topics to create content for, or citation opportunities to pursue for better AI visibility. Guides through three strategies: content refresh, content creation, and offsite citations. Requires AirOps MCP connection."
 ---
 
 # AEO Opportunities & Actions
