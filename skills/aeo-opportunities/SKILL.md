@@ -38,6 +38,8 @@ Options:
 
 If the user picks a non-default period, pass `start_date` and `end_date` to **all** data calls throughout the workflow — `list_pages`, `list_aeo_prompts`, `list_aeo_citations`, `list_aeo_domains`, and `query_analytics` all accept these parameters.
 
+**Important: Use `brand_mentioned: false` for all prompt-based calls** (list_aeo_prompts, query_analytics). Branded prompts ("What is [BrandName]?") inflate mention rates because AI almost always mentions the brand when it's in the question. Non-branded gives the true picture. Only include branded if the user explicitly asks for a branded vs non-branded comparison.
+
 Run these calls **in parallel** to detect which strategy has the strongest signal:
 
 **Call A1 — losing AI visibility:**
@@ -67,7 +69,7 @@ list_pages(brand_kit_id, smart_filter: "rankings_slipping", per_page: 5)
 
 **Call B — Content Creation signal:**
 ```
-list_aeo_prompts(brand_kit_id, filters: [{field: "mention_rate", operator: "LEQ", value: 5}], sort: "-prompt_volume", per_page: 5)
+list_aeo_prompts(brand_kit_id, brand_mentioned: false, filters: [{field: "mention_rate", operator: "LEQ", value: 5}], sort: "-prompt_volume", per_page: 5)
 ```
 
 **Call C — Offsite signal:**
@@ -128,12 +130,14 @@ If neither GSC nor GA4 is connected, Content Refresh still works but is limited 
 
 #### If Content Creation:
 
-1. `list_aeo_prompts(brand_kit_id, filters: [{field: "mention_rate", operator: "LEQ", value: 5}], sort: "-prompt_volume", per_page: 20)` — uncovered high-volume queries
-2. `query_analytics(brand_kit_id, dimensions: ["competitor"], metrics: ["mention_rate"])` — which competitors dominate which topics
-3. `list_pages(brand_kit_id, per_page: 50)` — cross-reference to confirm no existing content covers these queries
+1. `list_aeo_prompts(brand_kit_id, brand_mentioned: false, filters: [{field: "mention_rate", operator: "LEQ", value: 5}], sort: "-prompt_volume", per_page: 20)` — uncovered high-volume queries
+2. `query_analytics(brand_kit_id, brand_mentioned: false, dimensions: ["competitor"], metrics: ["mention_rate"])` — which competitors dominate which topics
+3. **Refresh vs Create check (mandatory):** For every keyword identified, call `list_pages` to search for existing content — filter by `primary_keyword` AND by `url` containing relevant terms. If a page already exists, it's a **refresh** opportunity, not a creation one. Only classify as new content creation when you've confirmed no page exists. Show your work: state what you searched for and what you found.
+
+Prioritize by `relative_volume_score` — a prompt with 0.9 volume where you're not mentioned is a much bigger opportunity than one with 0.1 volume.
 
 Group results by action type:
-- **popular_query_gap** — high-volume prompts with zero or near-zero mention rate and no existing page
+- **popular_query_gap** — high-volume prompts with zero or near-zero mention rate and no existing page (confirmed via search)
 - **competitor_dominated_keyword** — prompts where competitors have significantly higher mention rates
 - **blue_ocean** — prompts with low mention rates across all brands (no dominant player)
 
@@ -152,6 +156,44 @@ Group results by action type:
 ### Step 4: Present Opportunities
 
 Present a table of discovered opportunities, grouped by action type. Include key metrics. Adapt columns based on available integrations.
+
+**Skip root/home pages** — filter out any URL that is just the domain root (path is `/` or empty). Home pages are not actionable content optimization targets.
+
+#### How to interpret the numbers
+
+When presenting results, don't just show raw numbers — explain the pattern. Lead with mention rate and share of voice, follow with citation rate as supporting context.
+
+**AI search metric patterns:**
+
+| Pattern | What it means | Action |
+|---|---|---|
+| High mention, low citation | Brand is known but not linked to | Create more authoritative, linkable content so AI has something to cite |
+| Low sentiment | AI talks about the brand negatively | Flag for messaging/PR review |
+| Declining mention + stable citation | Losing mindshare but content still works | Brand awareness campaign needed |
+| Declining citation + stable mention | Losing authority but still known | Content refresh — update outdated pages so AI trusts them again |
+
+**Single-signal page patterns:**
+
+| Pattern | What it means | Action |
+|---|---|---|
+| Losing AI citations (`losing_ai_visibility`) | AI is dropping references to this page | Content is going stale for AI. Refresh with current data, stats, examples. Check what AI is citing instead. |
+| Losing clicks, stable position (`losing_clicks`) | Ranking hasn't changed but fewer people click | Something else is eating clicks — likely AI overviews or featured snippets. Review meta title/description. |
+| Rankings slipping (`rankings_slipping`) | Position declining over time | Classic SEO issue — competitors may have fresher/better content. Audit and refresh. |
+| Almost page one (`almost_page_one`) | Ranking #11-20 | Quick win — small improvements could push to page 1. Strengthen content, add internal links. |
+| Citation rate decline, stable SEO (`citation_rate_decline`) | AI losing faith while Google still ranks it | Early warning. AI updates faster than Google. Refresh content now before both decline. |
+
+**Multi-signal page patterns (when GSC + GA4 available):**
+
+| AEO signal | GSC signal | GA4 signal | What's happening | Action |
+|---|---|---|---|---|
+| Citations dropping | Clicks dropping | Traffic dropping | Losing relevance across the board | Major content refresh or rewrite. Check what competitors are winning instead. |
+| Citations dropping | Clicks stable | Traffic stable | AI moving away but Google still sends traffic | Page works for traditional search but isn't structured for AI citation. Update to be more authoritative/quotable. |
+| Citations stable | Clicks dropping | Traffic dropping | AI still cites you but Google traffic falling | Traditional SEO issue — position may be slipping, or AI overviews are taking clicks. |
+| Citations rising | Clicks stable | Traffic rising | AI is sending more traffic via citations | Page is winning in AI search. Study what makes it work and replicate the pattern. |
+| Citations stable | Clicks rising | Traffic rising | Google sending more traffic, AI unchanged | Traditional SEO win. Focus AI optimization effort elsewhere. |
+| No citations | High clicks | High traffic | Google loves this page but AI doesn't cite it | Opportunity — optimize this high-traffic page to be more citable by AI. |
+
+**Benchmarks:** A 5-15% mention rate for non-branded prompts is good. Below 5% means significant room for improvement. Always factor in `relative_volume_score` when prioritizing — a high-volume prompt where you're not mentioned matters far more than a low-volume one.
 
 **Content Refresh example (with GSC + GA4):**
 
@@ -263,6 +305,12 @@ Tell the user: **"Your action grids are ready. Open them in AirOps to run power 
 
 ## Guidelines
 
+- **Default to non-branded** — Always use `brand_mentioned: false` for prompt-based calls unless the user explicitly asks for branded analysis
+- **Skip root pages** — Never include root/home page URLs in recommendations or action grids
+- **Refresh before create** — Always check if a page exists before classifying an opportunity as content creation. This is mandatory, not optional.
+- **Prioritize by volume** — Use `relative_volume_score` to rank opportunities. High volume + low mention = biggest opportunity.
+- **Don't report raw numbers without context** — Always pair metrics with trends and benchmarks. "12% mention rate" means nothing without knowing the direction and what's normal.
+- **Don't mix up mention and citation** — Mention = named in the response, citation = linked to. A brand can be mentioned without being cited.
 - **Prefer parallel calls** — Steps 2 and 3 contain independent API calls that should run concurrently
 - **Respect rate limits** — Use `per_page` parameters to limit result sets; start with 20 and paginate only if the user wants more
 - **Be transparent about signals** — If a strategy shows no results, say so and suggest another
