@@ -1,0 +1,9 @@
+{
+  "name": "airops",
+  "description": "AirOps plugin for Claude Code. Provides skills for AI Engine Optimization (AEO) — discover how AI assistants cite your brand, find optimization opportunities, and create action grids. Requires AirOps MCP connection.",
+  "version": "1.0.0",
+  "author": {
+    "name": "AirOps"
+  },
+  "homepage": "https://www.airops.com"
+}
